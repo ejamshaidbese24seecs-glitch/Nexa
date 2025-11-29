@@ -2,29 +2,38 @@ import json
 import re
 import time
 
+# CONFIGURATION
 dataset_path = r"C:\Users\Ehsan Ullah\Downloads\archive (4)\arxiv-metadata-oai-snapshot.json"
-limit = 1000000
+limit = 2000000 
 
+# STOP WORDS
 STOP_WORDS = {
-    "a", "an", "the", "and", "or", "but", "if", "of", "at", "by", "for", "with", 
-    "about", "against", "between", "into", "through", "during", "before", "after", 
-    "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", 
-    "under", "again", "further", "then", "once", "here", "there", "when", "where", 
-    "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", 
-    "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", 
-    "very", "can", "will", "just", "don", "should", "now", "are", "is", "was", "were"
+    "the", "and", "for", "that", "this", "with", "from", "which", "are", "was", "were", 
+    "have", "has", "had", "can", "could", "should", "would", "will", "not", "but", 
+    "into", "about", "than", "then", "they", "their", "them", "these", "those", "such",
+    "some", "only", "also", "very", "more", "most", "been", "being", "its", "it's",
+    "between", "through", "over", "under", "above", "below", "during", "while",
+    "before", "after", "where", "when", "why", "how", "what", "who", "whom", "whose",
+    "because", "until", "unless", "since", "upon", "within", "without", "there"
 }
 
 def clean_text(text):
-    words = re.findall(r'\w+', text.lower())
-    filtered_words = [
-        w for w in words 
-        if w not in STOP_WORDS and len(w) > 1 and not w.isdigit()
-    ]
+    # STRICT REGEX: [a-z]+ 
+    # This matches ONLY letters. It rejects numbers (0-9) and underscores (_).
+    words = re.findall(r'[a-z]+', text.lower())
+    
+    filtered_words = []
+    for w in words:
+        # FILTER:
+        # 1. Must be longer than 2 letters (removes 'is', 'to', 'at', 'my')
+        # 2. Must not be a stop word
+        if len(w) > 2 and w not in STOP_WORDS:
+            filtered_words.append(w)
+            
     return filtered_words
 
 def build_indices():
-    print(f"--- STARTING INDEXING FOR {limit} DOCUMENTS ---")
+    print(f"--- STARTING STRICT INDEXING FOR {limit} DOCUMENTS ---")
     start_time = time.time()
 
     lexicon = {}
@@ -64,7 +73,7 @@ def build_indices():
 
                 f_out.write(f"{doc_id}\t{' '.join(doc_word_ids)}\n")
 
-                if doc_id % 10000 == 0:
+                if doc_id % 50000 == 0:
                     print(f"Indexed {doc_id} documents...")
                 
                 doc_id += 1
@@ -72,6 +81,7 @@ def build_indices():
             except Exception:
                 pass
 
+    print("Saving Lexicon...")
     with open("lexicon.txt", "w", encoding="utf-8") as f_lex:
         for word, w_id in lexicon.items():
             f_lex.write(f"{word}\t{w_id}\n")
