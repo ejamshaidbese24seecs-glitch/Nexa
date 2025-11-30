@@ -6,34 +6,68 @@ import time
 dataset_path = r"C:\Users\Ehsan Ullah\Downloads\archive (4)\arxiv-metadata-oai-snapshot.json"
 limit = 2000000 
 
-# STOP WORDS
-STOP_WORDS = {
-    "the", "and", "for", "that", "this", "with", "from", "which", "are", "was", "were", 
-    "have", "has", "had", "can", "could", "should", "would", "will", "not", "but", 
-    "into", "about", "than", "then", "they", "their", "them", "these", "those", "such",
-    "some", "only", "also", "very", "more", "most", "been", "being", "its", "it's",
-    "between", "through", "over", "under", "above", "below", "during", "while",
-    "before", "after", "where", "when", "why", "how", "what", "who", "whom", "whose",
-    "because", "until", "unless", "since", "upon", "within", "without", "there"
+# 1. LANGUAGE MARKERS
+# If we see these, it's definitely English
+ENGLISH_STOP = {"the", "and", "is", "of", "in", "to", "with", "that", "for", "are", "this"}
+# If we see these, it's definitely German
+GERMAN_STOP = {"der", "die", "und", "ist", "den", "von", "zu", "das", "sich", "des", "eine", "mit"}
+# If we see these, it's definitely French
+FRENCH_STOP = {"le", "la", "et", "des", "en", "un", "une", "que", "dans", "pour", "sur", "qui"}
+
+# 2. FILTER WORDS TO IGNORE IN INDEX
+STOP_WORDS_FILTER = {
+    "a", "an", "the", "and", "or", "but", "if", "of", "at", "by", "for", "with", 
+    "about", "against", "between", "into", "through", "during", "before", "after", 
+    "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", 
+    "under", "again", "further", "then", "once", "here", "there", "when", "where", 
+    "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", 
+    "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", 
+    "very", "can", "will", "just", "don", "should", "now", "are", "is", "was", "were",
+    "this", "that", "these", "those", "have", "has", "had", "which"
 }
 
+def is_strictly_english(text):
+    """
+    Scores the document.
+    It passes ONLY if it has significantly more English words than German/French.
+    """
+    # Check first 500 words to be fast
+    words = text.lower().split()[:500]
+    
+    eng_score = 0
+    foreign_score = 0
+    
+    for w in words:
+        if w in ENGLISH_STOP:
+            eng_score += 1
+        elif w in GERMAN_STOP or w in FRENCH_STOP:
+            foreign_score += 1
+
+    # RULE 1: Must have at least some English markers
+    if eng_score < 3:
+        return False
+        
+    # RULE 2: Foreign words must be very rare (less than 10% of English markers)
+    # This kills German papers that just happen to use "in" or "pro"
+    if foreign_score > (eng_score * 0.1):
+        return False
+        
+    return True
+
 def clean_text(text):
-    # STRICT REGEX: [a-z]+ 
-    # This matches ONLY letters. It rejects numbers (0-9) and underscores (_).
+    # Strict regex: Only letters a-z. 
     words = re.findall(r'[a-z]+', text.lower())
     
     filtered_words = []
     for w in words:
-        # FILTER:
-        # 1. Must be longer than 2 letters (removes 'is', 'to', 'at', 'my')
-        # 2. Must not be a stop word
-        if len(w) > 2 and w not in STOP_WORDS:
+        # Keep word if > 2 chars and not in the stop list
+        if len(w) > 2 and w not in STOP_WORDS_FILTER:
             filtered_words.append(w)
             
     return filtered_words
 
 def build_indices():
-    print(f"--- STARTING STRICT INDEXING FOR {limit} DOCUMENTS ---")
+    print(f"--- STARTING STRICT ENGLISH INDEXING ---")
     start_time = time.time()
 
     lexicon = {}
@@ -57,6 +91,11 @@ def build_indices():
                 abstract = data.get('abstract', '').strip()
                 full_text = f"{title} {abstract}"
 
+                # 1. STRICT LANGUAGE CHECK
+                if not is_strictly_english(full_text):
+                    continue # Skip German/French docs
+
+                # 2. CLEAN TEXT
                 words = clean_text(full_text)
                 
                 if not words:
