@@ -37,3 +37,7 @@ def get_metadata(doc_id, meta_index):
     with open('metadata.json', 'r') as f:
         f.seek(offset)
         return f.readline()
+
+def generate_view_html(title, abstract):
+    # Generates a clean reading interface
+    return f'<html><h1>{title}</h1><p>{abstract}</p></html>'
