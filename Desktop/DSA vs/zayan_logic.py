@@ -46,3 +46,9 @@ def generate_view_html(title, abstract):
 def api_autocomplete():
     query = request.args.get('q')
     return jsonify(trie.search_prefix(query))
+
+# Final Integration Hook
+def init_search_engine():
+    load_lexicon()
+    build_trie()
+    print('System Ready')
