@@ -41,3 +41,8 @@ def get_metadata(doc_id, meta_index):
 def generate_view_html(title, abstract):
     # Generates a clean reading interface
     return f'<html><h1>{title}</h1><p>{abstract}</p></html>'
+
+@app.route('/autocomplete')
+def api_autocomplete():
+    query = request.args.get('q')
+    return jsonify(trie.search_prefix(query))
