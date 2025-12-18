@@ -52,3 +52,5 @@ def init_search_engine():
     load_lexicon()
     build_trie()
     print('System Ready')
+
+# End of Zayan Logic Module
