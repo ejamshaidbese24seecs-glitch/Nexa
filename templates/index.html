@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXA | Intelligent Search</title>
+    <style>
+        :root {
+            --primary: #6366f1; 
+            --accent: #a855f7;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --card-hover: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        
+        body {
+            background: var(--bg-gradient); color: var(--text-main);
+            min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden;
+        }
+
+        .ambient-light {
+            position: fixed; width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+            border-radius: 50%; top: -200px; left: -100px; z-index: -1;
+            animation: float 10s infinite ease-in-out;
+        }
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, 50px); }
+        }
+
+        nav {
+            padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;
+            backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border);
+        }
+        .nav-brand {
+            font-size: 1.5rem; font-weight: 700;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .hero {
+            display: flex; flex-direction: column; align-items: center;
+            padding: 60px 20px 40px; width: 100%; max-width: 800px; margin: 0 auto; text-align: center;
+        }
+        .hero h1 { font-size: 4rem; font-weight: 800; margin-bottom: 10px; opacity: 0; animation: fadeUp 0.8s ease-out 0.2s forwards; }
+        .hero p { color: var(--text-muted); margin-bottom: 40px; opacity: 0; animation: fadeUp 0.8s ease-out 0.4s forwards; }
+
+        .search-container { width: 100%; position: relative; opacity: 0; animation: fadeUp 0.8s ease-out 0.6s forwards; z-index: 100; }
+        
+        input[type="text"] {
+            width: 100%; padding: 20px 60px 20px 30px; font-size: 1.1rem;
+            background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 16px;
+            color: white; backdrop-filter: blur(12px); transition: all 0.3s;
+        }
+        input[type="text"]:focus {
+            outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        #suggestions-box {
+            position: absolute; top: 115%; left: 0; right: 0;
+            background: rgba(30, 41, 59, 0.95); border: 1px solid var(--glass-border); border-radius: 12px;
+            backdrop-filter: blur(20px); overflow: hidden; display: none;
+        }
+        .suggestion-item {
+            padding: 15px 25px; cursor: pointer; color: var(--text-muted);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .suggestion-item:hover { background: var(--primary); color: white; }
+
+        .results-section { width: 100%; max-width: 800px; margin: 0 auto; padding: 20px; }
+
+        /* RESULT CARD IS NOW AN 'A' TAG (LINK) */
+        .result-card {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 16px; padding: 25px; margin-bottom: 20px;
+            transition: all 0.3s; opacity: 0; transform: translateY(20px);
+            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            display: block; text-decoration: none; /* Make card clickable */
+        }
+        .result-card:hover { transform: translateY(-5px); background: var(--card-hover); }
+
+        .result-title { font-size: 1.25rem; font-weight: 600; color: #818cf8; margin-bottom: 10px; display: block; }
+        .result-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; font-size: 0.85rem; color: var(--text-muted); }
+        
+        .score-pill {
+            background: rgba(99, 102, 241, 0.2); color: #c7d2fe;
+            padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.75rem;
+        }
+
+        .result-abstract { line-height: 1.6; color: #cbd5e1; font-size: 0.95rem; }
+
+        .result-card:nth-child(1) { animation-delay: 0.1s; }
+        .result-card:nth-child(2) { animation-delay: 0.2s; }
+        .result-card:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes fadeUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideUpFade { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="ambient-light"></div>
+
+    <nav>
+        <div class="nav-brand">NEXA</div>
+    </nav>
+
+    <div class="hero">
+        <h1>Discover Knowledge.</h1>
+        <p>AI-Powered search with semantic scoring.</p>
+
+        <form method="POST" autocomplete="off" id="search-form" class="search-container">
+            <input type="text" id="search-box" name="search_query" placeholder="What are you looking for?" value="{{ query }}">
+            <div id="suggestions-box"></div>
+        </form>
+    </div>
+
+    <div class="results-section">
+        {% if error %}
+            <div class="result-card" style="border-color: #ef4444;">
+                <h3 style="color: #ef4444;">No Results Found</h3>
+                <p style="color: #9ca3af;">{{ error }}</p>
+            </div>
+        {% endif %}
+
+        {% if time %}
+        <div style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.9rem;">
+            Found {{ results|length }} results in {{ time }} seconds
+        </div>
+        {% endif %}
+
+        {% for res in results %}
+        <a href="/view/{{ res.id }}" class="result-card">
+            <span class="result-title">{{ res.title }}</span>
+            <div class="result-meta">
+                <span class="score-pill">SCORE: {{ res.score }}</span>
+                <span>•</span>
+                <span>{{ res.authors }}</span>
+            </div>
+            <div class="result-abstract">
+                {{ res.abstract[:280] }}...
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <script>
+        const searchBox = document.getElementById('search-box');
+        const suggestionsBox = document.getElementById('suggestions-box');
+        const form = document.getElementById('search-form');
+
+        searchBox.addEventListener('input', async function() {
+            const query = this.value;
+            if (query.length < 2) { suggestionsBox.style.display = 'none'; return; }
+
+            const response = await fetch(`/autocomplete?q=${query}`);
+            const suggestions = await response.json();
+            suggestionsBox.innerHTML = '';
+            
+            if (suggestions.length > 0) {
+                suggestionsBox.style.display = 'block';
+                suggestions.forEach(word => {
+                    const item = document.createElement('div');
+                    item.className = 'suggestion-item';
+                    item.textContent = word;
+                    item.onclick = function() {
+                        searchBox.value = word;
+                        suggestionsBox.style.display = 'none';
+                        form.submit();
+                    };
+                    suggestionsBox.appendChild(item);
+                });
+            } else { suggestionsBox.style.display = 'none'; }
+        });
+        
+        document.addEventListener('click', function(e) {
+            if (!searchBox.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

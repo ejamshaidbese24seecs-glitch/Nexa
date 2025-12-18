@@ -3,7 +3,6 @@ import time
 import os
 from collections import Counter
 import json
-import difflib  # <--- NEW: For "Did you mean?" AI correction
 
 app = Flask(__name__)
 
@@ -37,8 +36,7 @@ class Trie:
     def search_prefix(self, prefix):
         node = self.root
         for char in prefix:
-            if char not in node.children:
-                return []
+            if char not in node.children: return []
             node = node.children[char]
         results = []
         self._dfs(node, results)
@@ -46,8 +44,7 @@ class Trie:
 
     def _dfs(self, node, results):
         if len(results) >= 5: return
-        if node.is_end_of_word:
-            results.append(node.word)
+        if node.is_end_of_word: results.append(node.word)
         for char in sorted(node.children.keys()):
             self._dfs(node.children[char], results)
 
@@ -84,6 +81,7 @@ def get_word_scores(word_id):
     barrel_path = os.path.join(BARRELS_DIR, f"barrel_{barrel_id}.txt")
     scores = {}
     if not os.path.exists(barrel_path): return scores
+    
     target_key = str(word_id) + ":"
     try:
         with open(barrel_path, "r", encoding="utf-8") as f:
@@ -108,46 +106,23 @@ def get_metadata(doc_id):
         except: return {'title': 'Error', 'authors': 'Unknown', 'abstract': ''}
     return {'title': 'Unknown', 'authors': 'Unknown', 'abstract': ''}
 
-# --- ROUTES ---
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        original_query = request.form.get('search_query', '').lower().strip()
-        if not original_query: return render_template('index.html')
+        query = request.form.get('search_query', '').lower().strip()
+        if not query: return render_template('index.html')
 
         start_time = time.time()
-        words = original_query.split()
+        words = query.split()
         
-        # --- "AI" SPELLING CORRECTION LOGIC ---
-        corrected_words = []
-        was_corrected = False
+        # Simple Search (No Spell Check)
+        if words[0] not in lexicon:
+            return render_template('index.html', error=f"Word '{words[0]}' not found.", query=query)
         
-        for word in words:
-            if word in lexicon:
-                corrected_words.append(word)
-            else:
-                # Find closest match using Levenshtein Distance
-                # n=1 means find top 1 match, cutoff=0.6 means must be 60% similar
-                matches = difflib.get_close_matches(word, lexicon.keys(), n=1, cutoff=0.6)
-                if matches:
-                    corrected_words.append(matches[0])
-                    was_corrected = True
-                else:
-                    # If no close match, keep original (it will fail search, but user sees it)
-                    corrected_words.append(word)
-        
-        # Use the corrected list for the actual search
-        final_query_list = corrected_words
-        
-        # 1. Search Logic
-        if final_query_list[0] not in lexicon:
-            return render_template('index.html', error=f"No results found for '{original_query}'.", query=original_query)
-        
-        first_id = lexicon[final_query_list[0]]
+        first_id = lexicon[words[0]]
         final_scores = get_word_scores(first_id)
         
-        for word in final_query_list[1:]:
+        for word in words[1:]:
             if word in lexicon:
                 next_scores = get_word_scores(lexicon[word])
                 intersected = {}
@@ -156,7 +131,7 @@ def index():
                         intersected[doc_id] = final_scores[doc_id] + next_scores[doc_id]
                 final_scores = intersected
             else:
-                 return render_template('index.html', error=f"No results for '{word}'", query=original_query)
+                 return render_template('index.html', error=f"Word '{word}' not found.", query=query)
 
         ranked_docs = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)[:10]
         results = []
@@ -164,19 +139,91 @@ def index():
             meta = get_metadata(doc_id)
             if meta:
                 meta['score'] = score
+                meta['id'] = doc_id  # <--- WE SAVE ID HERE TO USE IN LINK
                 results.append(meta)
 
         duration = round(time.time() - start_time, 4)
-        
-        # Pass both original and corrected query to HTML
-        corrected_string = " ".join(corrected_words)
-        return render_template('index.html', 
-                               results=results, 
-                               query=original_query, 
-                               time=duration,
-                               corrected_query=corrected_string if was_corrected else None)
+        return render_template('index.html', results=results, query=query, time=duration)
 
     return render_template('index.html')
+
+# --- THIS IS THE NEW PAGE FOR VIEWING A DOCUMENT ---
+@app.route('/view/<int:doc_id>')
+def view_document(doc_id):
+    meta = get_metadata(doc_id)
+    # This generates a simple, clean page for just that one document
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{meta['title']}</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', system-ui, sans-serif;
+                background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+                color: #f8fafc;
+                margin: 0;
+                padding: 40px;
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+            }}
+            .container {{
+                background: rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 16px;
+                padding: 40px;
+                max-width: 800px;
+                width: 100%;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            }}
+            .btn {{
+                display: inline-block;
+                margin-bottom: 20px;
+                color: #818cf8;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 0.9rem;
+            }}
+            .btn:hover {{ color: white; text-decoration: underline; }}
+            h1 {{
+                font-size: 2rem;
+                margin-bottom: 10px;
+                line-height: 1.2;
+                color: #e2e8f0;
+            }}
+            .meta-info {{
+                color: #94a3b8;
+                font-size: 1rem;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                font-style: italic;
+            }}
+            .content {{
+                line-height: 1.8;
+                font-size: 1.1rem;
+                color: #cbd5e1;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <a href="/" class="btn">← Back to Search Results</a>
+            <h1>{meta['title']}</h1>
+            <div class="meta-info">Authors: {meta['authors']}</div>
+            
+            <div class="content">
+                <strong>Abstract:</strong><br><br>
+                {meta['abstract']}
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route('/autocomplete')
 def autocomplete():
