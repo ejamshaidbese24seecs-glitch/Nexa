@@ -18,3 +18,8 @@ class Trie:
             if char not in node.children: return []
             node = node.children[char]
         return self._dfs(node, [])
+
+    def _dfs(self, node, results):
+        if len(results) >= 5: return
+        if node.is_end_of_word: results.append(node.word)
+        for char in node.children: self._dfs(node.children[char], results)
