@@ -23,3 +23,10 @@ class Trie:
         if len(results) >= 5: return
         if node.is_end_of_word: results.append(node.word)
         for char in node.children: self._dfs(node.children[char], results)
+
+# Frontend CSS Logic
+css_glass = {
+    'background': 'rgba(255, 255, 255, 0.05)',
+    'backdrop-filter': 'blur(10px)',
+    'border': '1px solid rgba(255, 255, 255, 0.1)'
+}
