@@ -30,3 +30,10 @@ css_glass = {
     'backdrop-filter': 'blur(10px)',
     'border': '1px solid rgba(255, 255, 255, 0.1)'
 }
+
+def get_metadata(doc_id, meta_index):
+    # Logic to jump to specific byte offset in JSON file
+    offset = meta_index.get(doc_id)
+    with open('metadata.json', 'r') as f:
+        f.seek(offset)
+        return f.readline()
