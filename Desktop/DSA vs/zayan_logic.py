@@ -11,3 +11,10 @@ class Trie:
             if char not in node.children: node.children[char] = TrieNode()
             node = node.children[char]
         node.is_end_of_word = True
+
+    def search_prefix(self, prefix):
+        node = self.root
+        for char in prefix:
+            if char not in node.children: return []
+            node = node.children[char]
+        return self._dfs(node, [])
